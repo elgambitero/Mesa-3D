@@ -39,23 +39,23 @@
 #include <stdio.h>
 #include <errno.h>
 
-/* CAYMAN notes 
+/* CAYMAN notes
 Why CAYMAN got loops for lots of instructions is explained here.
 
 -These 8xx t-slot only ops are implemented in all vector slots.
 MUL_LIT, FLT_TO_UINT, INT_TO_FLT, UINT_TO_FLT
-These 8xx t-slot only opcodes become vector ops, with all four 
-slots expecting the arguments on sources a and b. Result is 
+These 8xx t-slot only opcodes become vector ops, with all four
+slots expecting the arguments on sources a and b. Result is
 broadcast to all channels.
 MULLO_INT, MULHI_INT, MULLO_UINT, MULHI_UINT, MUL_64
-These 8xx t-slot only opcodes become vector ops in the z, y, and 
+These 8xx t-slot only opcodes become vector ops in the z, y, and
 x slots.
 EXP_IEEE, LOG_IEEE/CLAMPED, RECIP_IEEE/CLAMPED/FF/INT/UINT/_64/CLAMPED_64
 RECIPSQRT_IEEE/CLAMPED/FF/_64/CLAMPED_64
 SQRT_IEEE/_64
 SIN/COS
-The w slot may have an independent co-issued operation, or if the 
-result is required to be in the w slot, the opcode above may be 
+The w slot may have an independent co-issued operation, or if the
+result is required to be in the w slot, the opcode above may be
 issued in the w slot as well.
 The compiler must issue the source argument to slots z, y, and x
 */
@@ -2095,8 +2095,10 @@ static int emit_streamout(struct r600_shader_ctx *ctx, struct pipe_stream_output
 			ctx->enabled_stream_buffers_mask |= 1 << so->output[i].output_buffer;
 		}
 		r = r600_bytecode_add_output(ctx->bc, &output);
-		if (r)
+		if (r){
+			R600_ERR("Bytecode add output error\r\n");
 			goto out_err;
+		}
 	}
 	return 0;
 out_err:
@@ -3138,6 +3140,7 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 			ctx.literals = realloc(ctx.literals, (ctx.nliterals + 1) * 16);
 			if(ctx.literals == NULL) {
 				r = -ENOMEM;
+				R600_ERR("OUT of memory shader error\r\n");
 				goto out_err;
 			}
 			ctx.literals[ctx.nliterals * 4 + 0] = immediate->u[0].Uint;
@@ -3148,8 +3151,10 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 			break;
 		case TGSI_TOKEN_TYPE_DECLARATION:
 			r = tgsi_declaration(&ctx);
-			if (r)
+			if (r){
+				R600_ERR("Wrong TGSI declaration\r\n");
 				goto out_err;
+			}
 			break;
 		case TGSI_TOKEN_TYPE_INSTRUCTION:
 		case TGSI_TOKEN_TYPE_PROPERTY:
@@ -3160,7 +3165,7 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 			goto out_err;
 		}
 	}
-	
+
 	shader->ring_item_sizes[0] = ctx.next_ring_offset;
 	shader->ring_item_sizes[1] = 0;
 	shader->ring_item_sizes[2] = 0;
@@ -3277,23 +3282,33 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 		switch (ctx.parse.FullToken.Token.Type) {
 		case TGSI_TOKEN_TYPE_INSTRUCTION:
 			r = tgsi_is_supported(&ctx);
-			if (r)
+			if (r){
+				R600_ERR("TGSI not supported\r\n");
 				goto out_err;
+			}
 			ctx.max_driver_temp_used = 0;
 			/* reserve first tmp for everyone */
 			r600_get_temp(&ctx);
 
 			opcode = ctx.parse.FullToken.FullInstruction.Instruction.Opcode;
-			if ((r = tgsi_split_constant(&ctx)))
+			if ((r = tgsi_split_constant(&ctx))){
+				R600_ERR("TGSI split constant ERROR\r\n");
 				goto out_err;
-			if ((r = tgsi_split_literal_constant(&ctx)))
+			}
+			if ((r = tgsi_split_literal_constant(&ctx))){
+				R600_ERR("TGSI split literal constant ERROR\r\n");
 				goto out_err;
+			}
 			if (ctx.type == PIPE_SHADER_GEOMETRY) {
-				if ((r = tgsi_split_gs_inputs(&ctx)))
+				if ((r = tgsi_split_gs_inputs(&ctx))){
+					R600_ERR("TGSI split gs inputs ERROR\r\n");
 					goto out_err;
+				}
 			} else if (lds_inputs) {
-				if ((r = tgsi_split_lds_inputs(&ctx)))
+				if ((r = tgsi_split_lds_inputs(&ctx))){
+					R600_ERR("TGSI split gs inputs ERROR\r\n");
 					goto out_err;
+				}
 			}
 			if (ctx.bc->chip_class == CAYMAN)
 				ctx.inst_info = &cm_shader_tgsi_instruction[opcode];
@@ -3302,13 +3317,17 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 			else
 				ctx.inst_info = &r600_shader_tgsi_instruction[opcode];
 			r = ctx.inst_info->process(&ctx);
-			if (r)
+			if (r){
+				R600_ERR("inst info process ERROR\r\n");
 				goto out_err;
+			}
 
 			if (ctx.type == PIPE_SHADER_TESS_CTRL) {
 				r = r600_store_tcs_output(&ctx);
-				if (r)
+				if (r){
+					R600_ERR("Store tcs output ERROR\r\n");
 					goto out_err;
+				}
 			}
 			break;
 		default:
@@ -3636,8 +3655,10 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 		/* add output to bytecode */
 		for (i = 0; i < noutput; i++) {
 			r = r600_bytecode_add_output(ctx.bc, &output[i]);
-			if (r)
+			if (r){
+				R600_ERR("Bytecode add output error\r\n");
 				goto out_err;
+			}
 		}
 	}
 
@@ -4259,7 +4280,7 @@ static int cayman_emit_float_instr(struct r600_shader_ctx *ctx)
 	int i, j, r;
 	struct r600_bytecode_alu alu;
 	int last_slot = (inst->Dst[0].Register.WriteMask & 0x8) ? 4 : 3;
-	
+
 	for (i = 0 ; i < last_slot; i++) {
 		memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 		alu.op = ctx->inst_info->op;
@@ -4727,7 +4748,7 @@ static int tgsi_lit(struct r600_shader_ctx *ctx)
 					alu.last = 1;
 				} else
 					alu.dst.write = 0;
-				
+
 				r = r600_bytecode_add_alu(ctx->bc, &alu);
 				if (r)
 					return r;
@@ -5203,7 +5224,7 @@ static int tgsi_divmod(struct r600_shader_ctx *ctx, int mod, int signed_op)
 
 			memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 			alu.op = ALU_OP1_FLT_TO_UINT;
-		  
+
 			alu.dst.sel = tmp0;
 			alu.dst.chan = 0;
 			alu.dst.write = 1;
@@ -5274,7 +5295,7 @@ static int tgsi_divmod(struct r600_shader_ctx *ctx, int mod, int signed_op)
 			} else {
 				r600_bytecode_src(&alu.src[1], &ctx->src[1], i);
 			}
-			
+
 			alu.last = 1;
 			if ((r = r600_bytecode_add_alu(ctx->bc, &alu)))
 				return r;
@@ -5540,7 +5561,7 @@ static int tgsi_divmod(struct r600_shader_ctx *ctx, int mod, int signed_op)
 			} else {
 				r600_bytecode_src(&alu.src[0], &ctx->src[1], i);
 			}
-			
+
 			alu.src[1].sel = tmp0;
 			alu.src[1].chan = 2;
 
@@ -6933,7 +6954,7 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
 		if (r)
 			return r;
-		/* write initial compare value into Z component 
+		/* write initial compare value into Z component
 		  - W src 0 for shadow cube
 		  - X src 1 for shadow cube array */
 		if (inst->Texture.Texture == TGSI_TEXTURE_SHADOWCUBE ||
@@ -7011,7 +7032,7 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 				r = r600_bytecode_add_alu(ctx->bc, &alu);
 				if (r)
 					return r;
-					
+
 				r = r600_bytecode_add_tex(ctx->bc, &tex);
 				if (r)
 					return r;
@@ -7338,7 +7359,7 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 	/* does this shader want a num layers from TXQ for a cube array? */
 	if (has_txq_cube_array_z) {
 		int id = tgsi_tex_get_src_gpr(ctx, sampler_src_reg);
-		
+
 		memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 		alu.op = ALU_OP1_MOV;
 
@@ -7992,10 +8013,10 @@ static int tgsi_log(struct r600_shader_ctx *ctx)
 				alu.op = ALU_OP1_LOG_IEEE;
 				r600_bytecode_src(&alu.src[0], &ctx->src[0], 0);
 				r600_bytecode_src_set_abs(&alu.src[0]);
-			
+
 				alu.dst.sel = ctx->temp_reg;
 				alu.dst.chan = i;
-				if (i == 0) 
+				if (i == 0)
 					alu.dst.write = 1;
 				if (i == 2)
 					alu.last = 1;
@@ -8010,7 +8031,7 @@ static int tgsi_log(struct r600_shader_ctx *ctx)
 			alu.op = ALU_OP1_LOG_IEEE;
 			r600_bytecode_src(&alu.src[0], &ctx->src[0], 0);
 			r600_bytecode_src_set_abs(&alu.src[0]);
-			
+
 			alu.dst.sel = ctx->temp_reg;
 			alu.dst.chan = 0;
 			alu.dst.write = 1;
@@ -8051,10 +8072,10 @@ static int tgsi_log(struct r600_shader_ctx *ctx)
 					alu.dst.write = 1;
 				if (i == 2)
 					alu.last = 1;
-				
+
 				r = r600_bytecode_add_alu(ctx->bc, &alu);
 				if (r)
-					return r;	
+					return r;
 			}
 		} else {
 			memset(&alu, 0, sizeof(struct r600_bytecode_alu));
@@ -8135,7 +8156,7 @@ static int tgsi_log(struct r600_shader_ctx *ctx)
 					alu.dst.write = 1;
 				if (i == 2)
 					alu.last = 1;
-				
+
 				r = r600_bytecode_add_alu(ctx->bc, &alu);
 				if (r)
 					return r;
@@ -8874,7 +8895,7 @@ static int tgsi_umad(struct r600_shader_ctx *ctx)
 
 		alu.src[0].sel = ctx->temp_reg;
 		alu.src[0].chan = i;
-		
+
 		r600_bytecode_src(&alu.src[1], &ctx->src[2], i);
 		if (i == lasti) {
 			alu.last = 1;
