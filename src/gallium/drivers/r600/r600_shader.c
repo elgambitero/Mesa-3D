@@ -7609,7 +7609,7 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 	struct tgsi_full_instruction *inst = &ctx->parse.FullToken.FullInstruction;
 	struct r600_bytecode_alu alu;
 	int lasti = tgsi_last_instruction(inst->Dst[0].Register.WriteMask);
-	unsigned i, temp_regs[2];
+	unsigned i, j, temp_regs[2];
 	int r;
 
 	/* optimize if it's just an equal balance */
@@ -7685,7 +7685,7 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 	}
 
 	/* src0 * src1 + (1 - src0) * src2 */
-        if (ctx->src[0].abs)
+  if (ctx->src[0].abs)
 		temp_regs[0] = r600_get_temp(ctx);
 	else
 		temp_regs[0] = 0;
@@ -7701,17 +7701,16 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 		memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 		alu.op = ALU_OP3_MULADD;
 		alu.is_op3 = 1;
-		r = tgsi_make_src_for_op3(ctx, temp_regs[0], i, &alu.src[0], &ctx->src[0]);
-		if (r){
-			R600_ERR("Failed to make src for op3 for temp register 0.\r\n");
-			return r;
+
+		for (j = 0; j < 2; j++) {
+			r = tgsi_make_src_for_op3(ctx, temp_regs[j], i, &alu.src[j], &ctx->src[j]);
+			if (r){
+				R600_ERR("Failed to make src for op3 for temp register %d.\r\n",j);
+				return r;
+			}
 		}
-		r = tgsi_make_src_for_op3(ctx, temp_regs[1], i, &alu.src[1], &ctx->src[1]);
-		if (r){
-			R600_ERR("Failed to make src for op3 for temp register 1.\r\n");
-			return r;
-		}
-		alu.src[2].sel = ctx->temp_reg;
+
+		alu.src[2].sel = ctx->temp_reg; //this register... I doubt it is R4..
 		alu.src[2].chan = i;
 
 		tgsi_dst(ctx, &inst->Dst[0], i, &alu.dst);
@@ -7721,7 +7720,7 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 		}
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
 		if (r){
-			R600_ERR("ALU add failed for src0 * src1 + (1 - src0) * src2.\r\n");
+			R600_ERR("ALU add failed for src0 * src1 + (1 - src0) * src2. for register %d of %d\r\n",i,lasti);
 			return r;
 		}
 	}
