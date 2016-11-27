@@ -3318,7 +3318,7 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 				ctx.inst_info = &r600_shader_tgsi_instruction[opcode];
 			r = ctx.inst_info->process(&ctx);
 			if (r){
-				R600_ERR("inst info process ERROR\r\n");
+				R600_ERR("inst info process ERROR with opcode: %d\r\n",opcode);
 				goto out_err;
 			}
 
@@ -7629,8 +7629,10 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 				alu.last = 1;
 			}
 			r = r600_bytecode_add_alu(ctx->bc, &alu);
-			if (r)
+			if (r){
+				R600_ERR("ALU add failed in equal balance LRP.\r\n");
 				return r;
+			}
 		}
 		return 0;
 	}
@@ -7653,8 +7655,10 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 		}
 		alu.dst.write = 1;
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
-		if (r)
+		if (r){
+			R600_ERR("ALU add failed in (1 - src0) operation.\r\n");
 			return r;
+		}
 	}
 
 	/* (1 - src0) * src2 */
@@ -7674,8 +7678,10 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 		}
 		alu.dst.write = 1;
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
-		if (r)
+		if (r){
+			R600_ERR("ALU add failed in (1 - src0)*src2 operation.\r\n");
 			return r;
+		}
 	}
 
 	/* src0 * src1 + (1 - src0) * src2 */
@@ -7696,11 +7702,15 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 		alu.op = ALU_OP3_MULADD;
 		alu.is_op3 = 1;
 		r = tgsi_make_src_for_op3(ctx, temp_regs[0], i, &alu.src[0], &ctx->src[0]);
-		if (r)
+		if (r){
+			R600_ERR("Failed to make src for op3 for temp register 0.\r\n");
 			return r;
+		}
 		r = tgsi_make_src_for_op3(ctx, temp_regs[1], i, &alu.src[1], &ctx->src[1]);
-		if (r)
+		if (r){
+			R600_ERR("Failed to make src for op3 for temp register 1.\r\n");
 			return r;
+		}
 		alu.src[2].sel = ctx->temp_reg;
 		alu.src[2].chan = i;
 
@@ -7710,8 +7720,10 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 			alu.last = 1;
 		}
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
-		if (r)
+		if (r){
+			R600_ERR("ALU add failed for src0 * src1 + (1 - src0) * src2.\r\n");
 			return r;
+		}
 	}
 	return 0;
 }
