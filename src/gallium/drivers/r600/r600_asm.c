@@ -421,6 +421,9 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 		} else if (bs->hw_cfile_addr[res] == sel &&
 			bs->hw_cfile_elem[res] == chan)
 			return 0; /* Read for this scalar element already reserved, nothing to do here. */
+
+		//R600_ERR("Failed to reserve cfile because of %i\r\n",bs->hw_cfile_addr[0]);
+
 	}
 	/* All cfile read ports are used, cannot reference vector element. */
 	return -1;
@@ -473,7 +476,6 @@ static int check_vector(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 		} else if (is_cfile(sel)) {
 			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<16) + sel, elem);
 			if (r){
-				R600_ERR("Failed to reserve cfile.\r\n");
 				return r;
 			}
 		}
@@ -501,8 +503,9 @@ static int check_scalar(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 		}
 		if (is_cfile(sel)) {
 			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<16) + sel, elem);
-			if (r)
-				return r;
+			if (r){
+					return r;
+			}
 		}
 	}
 	for (src = 0; src < num_src; ++src) {
@@ -562,14 +565,12 @@ static int check_and_set_bank_swizzle(struct r600_bytecode *bc,
 
 	bank_swizzle[4] = SQ_ALU_SCL_210;
 	while(bank_swizzle[4] <= SQ_ALU_SCL_221) {
-
 		init_bank_swizzle(&bs);
 		if (scalar_only == false) {
 			for (i = 0; i < 4; i++) {
 				if (slots[i]) {
 					r = check_vector(bc, slots[i], &bs, bank_swizzle[i]);
 					if (r){
-						R600_ERR("Vector check failed\r\n");
 						break;
 					}
 				}
@@ -606,7 +607,6 @@ static int check_and_set_bank_swizzle(struct r600_bytecode *bc,
 	}
 
 	/* Couldn't find a working swizzle. */
-	R600_ERR("Couldn't find a working swizzle.\r\n");
 	return -1;
 }
 
@@ -1187,10 +1187,9 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc,
 	struct r600_bytecode_alu *lalu;
 	int i, r;
 
-	if (!nalu){
+	if (!nalu)
 		return -ENOMEM;
-		R600_ERR("ALU add operation returned ENOMEM: %d\r\n",r);
-	}
+
 	memcpy(nalu, alu, sizeof(struct r600_bytecode_alu));
 
 	if (alu->is_op3) {
@@ -1216,7 +1215,6 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc,
 	if (bc->cf_last == NULL || bc->force_add_cf) {
 		r = r600_bytecode_add_cf(bc);
 		if (r) {
-			R600_ERR("ALU add returned with failed cf_add: %d\r\n",r);
 			free(nalu);
 			return r;
 		}
@@ -1241,7 +1239,6 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc,
 	/* Setup the kcache for this ALU instruction. This will start a new
 	 * ALU clause if needed. */
 	if ((r = r600_bytecode_alloc_kcache_lines(bc, nalu, type))) {
-		R600_ERR("ALU add returned with failed alloc kcache lines: %d\r\n",r);
 		free(nalu);
 		return r;
 	}
@@ -1274,14 +1271,12 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc,
 		int max_slots = bc->chip_class == CAYMAN ? 4 : 5;
 		r = assign_alu_units(bc, bc->cf_last->curr_bs_head, slots);
 		if (r){
-			R600_ERR("ALU add failed to assign alu units: %d\r\n",r);
 			return r;
 		}
 
 		if (bc->cf_last->prev_bs_head) {
 			r = merge_inst_groups(bc, slots, bc->cf_last->prev_bs_head);
 			if (r){
-				R600_ERR("ALU add failed to merge inst groups: %d\r\n",r);
 				return r;
 			}
 		}
@@ -1289,7 +1284,6 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc,
 		if (bc->cf_last->prev_bs_head) {
 			r = replace_gpr_with_pv_ps(bc, slots, bc->cf_last->prev_bs_head);
 			if (r){
-				R600_ERR("ALU add failed to replace gpr: %d\r\n",r);
 				return r;
 			}
 		}

@@ -3984,6 +3984,7 @@ static int tgsi_op2_s(struct r600_shader_ctx *ctx, int swap, int trans_only)
 			alu.src[0].chan = i;
 			alu.last = (i == lasti);
 
+			alu.bank_swizzle_force = SQ_ALU_VEC_012;
 			r = r600_bytecode_add_alu(ctx->bc, &alu);
 			if (r)
 				return r;
@@ -7609,7 +7610,8 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 	struct tgsi_full_instruction *inst = &ctx->parse.FullToken.FullInstruction;
 	struct r600_bytecode_alu alu;
 	int lasti = tgsi_last_instruction(inst->Dst[0].Register.WriteMask);
-	unsigned i, j, temp_regs[2];
+	int num_src_regs = inst->Instruction.NumSrcRegs;
+	unsigned i, j, temp_regs[num_src_regs];
 	int r;
 
 	/* optimize if it's just an equal balance */
@@ -7685,23 +7687,21 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 	}
 
 	/* src0 * src1 + (1 - src0) * src2 */
-  if (ctx->src[0].abs)
-		temp_regs[0] = r600_get_temp(ctx);
-	else
-		temp_regs[0] = 0;
-	if (ctx->src[1].abs)
-		temp_regs[1] = r600_get_temp(ctx);
-	else
-		temp_regs[1] = 0;
+	for (j = 0; j < 2; j++){
+		if (ctx->src[j].abs)
+			temp_regs[j] = r600_get_temp(ctx);
+		else
+			temp_regs[j] = 0;
+	}
 
 	for (i = 0; i < lasti + 1; i++) {
+
 		if (!(inst->Dst[0].Register.WriteMask & (1 << i)))
 			continue;
 
 		memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 		alu.op = ALU_OP3_MULADD;
 		alu.is_op3 = 1;
-
 		for (j = 0; j < 2; j++) {
 			r = tgsi_make_src_for_op3(ctx, temp_regs[j], i, &alu.src[j], &ctx->src[j]);
 			if (r){
@@ -7710,14 +7710,17 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 			}
 		}
 
-		alu.src[2].sel = ctx->temp_reg; //this register... I doubt it is R4..
+		alu.src[2].sel = ctx->temp_reg;
 		alu.src[2].chan = i;
 
 		tgsi_dst(ctx, &inst->Dst[0], i, &alu.dst);
+
 		alu.dst.chan = i;
+		alu.dst.write = 1;
 		if (i == lasti) {
 			alu.last = 1;
 		}
+		alu.bank_swizzle_force = SQ_ALU_SCL_122;
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
 		if (r){
 			R600_ERR("ALU add failed for src0 * src1 + (1 - src0) * src2. for register %d of %d\r\n",i,lasti);
