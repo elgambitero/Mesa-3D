@@ -421,10 +421,11 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 		} else if (bs->hw_cfile_addr[res] == sel &&
 			bs->hw_cfile_elem[res] == chan)
 			return 0; /* Read for this scalar element already reserved, nothing to do here. */
-
-		//R600_ERR("Failed to reserve cfile because of %i\r\n",bs->hw_cfile_addr[0]);
-
 	}
+
+	R600_ERR("Failed to reserve cfile when looking for %i\r\n",sel);
+	R600_ERR("hw_cfile_addr are [%i,%i,%i,%i]\r\n",bs->hw_cfile_addr[0],bs->hw_cfile_addr[1],bs->hw_cfile_addr[2],bs->hw_cfile_addr[3]);
+
 	/* All cfile read ports are used, cannot reference vector element. */
 	return -1;
 }
@@ -502,7 +503,7 @@ static int check_scalar(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 				const_count++;
 		}
 		if (is_cfile(sel)) {
-			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<16) + sel, elem);
+			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<32) + sel, elem);
 			if (r){
 					return r;
 			}
@@ -605,6 +606,9 @@ static int check_and_set_bank_swizzle(struct r600_bytecode *bc,
 			}
 		}
 	}
+
+
+
 
 	/* Couldn't find a working swizzle. */
 	return -1;
