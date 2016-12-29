@@ -410,6 +410,7 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 {
 	int res, num_res = 4;
 	if (bc->chip_class >= R700) {
+		R600_ERR("chip_class is: %d",bc->chip_class);
 		num_res = 2;
 		chan /= 2;
 	}
@@ -422,10 +423,10 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 			bs->hw_cfile_elem[res] == chan)
 			return 0; /* Read for this scalar element already reserved, nothing to do here. */
 	}
-
+/*
 	R600_ERR("Failed to reserve cfile when looking for %i\r\n",sel);
 	R600_ERR("hw_cfile_addr are [%i,%i,%i,%i]\r\n",bs->hw_cfile_addr[0],bs->hw_cfile_addr[1],bs->hw_cfile_addr[2],bs->hw_cfile_addr[3]);
-
+*/
 	/* All cfile read ports are used, cannot reference vector element. */
 	return -1;
 }
