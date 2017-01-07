@@ -410,7 +410,7 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 {
 	int res, num_res = 4;
 	if (bc->chip_class >= R700) {
-		R600_ERR("chip_class is: %d",bc->chip_class);
+		R600_ERR("chip_class is: %d, and not %d.\r\n",bc->chip_class,R700);
 		num_res = 2;
 		chan /= 2;
 	}

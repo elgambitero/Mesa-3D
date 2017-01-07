@@ -3235,6 +3235,8 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 			memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 			alu.op = ALU_OP1_RECIP_IEEE;
 			alu.src[0].sel = shader->input[ctx.fragcoord_input].gpr;
+			if(shader->input[ctx.fragcoord_input].gpr >= 256 && shader->input[ctx.fragcoord_input].gpr <= 511)
+				R600_ERR("CFILE TAKEN: %d\n\r",shader->input[ctx.fragcoord_input].gpr);
 			alu.src[0].chan = 3;
 
 			alu.dst.sel = shader->input[ctx.fragcoord_input].gpr;
