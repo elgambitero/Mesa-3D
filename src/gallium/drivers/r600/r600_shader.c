@@ -3235,8 +3235,6 @@ static int r600_shader_from_tgsi(struct r600_context *rctx,
 			memset(&alu, 0, sizeof(struct r600_bytecode_alu));
 			alu.op = ALU_OP1_RECIP_IEEE;
 			alu.src[0].sel = shader->input[ctx.fragcoord_input].gpr;
-			if(shader->input[ctx.fragcoord_input].gpr >= 256 && shader->input[ctx.fragcoord_input].gpr <= 511)
-				R600_ERR("CFILE TAKEN: %d\n\r",shader->input[ctx.fragcoord_input].gpr);
 			alu.src[0].chan = 3;
 
 			alu.dst.sel = shader->input[ctx.fragcoord_input].gpr;
@@ -7615,7 +7613,7 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 	int num_src_regs = inst->Instruction.NumSrcRegs;
 	unsigned i, j, temp_regs[num_src_regs];
 	int r;
-
+	R600_ERR("Entering lrp for %d components\n\r",lasti+1);
 	/* optimize if it's just an equal balance */
 	if (ctx->src[0].sel == V_SQ_ALU_SRC_0_5) {
 		for (i = 0; i < lasti + 1; i++) {
@@ -7679,6 +7677,10 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 		alu.dst.chan = i;
 		if (i == lasti) {
 			alu.last = 1;
+			if (ctx->bc->chip_class >= R700) {
+				//DO SOMETHING ABOUT TAKING THE 3RD CONSTANT for TRANS
+			}
+
 		}
 		alu.dst.write = 1;
 		r = r600_bytecode_add_alu(ctx->bc, &alu);

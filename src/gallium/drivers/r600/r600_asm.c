@@ -410,7 +410,7 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 {
 	int res, num_res = 4;
 	if (bc->chip_class >= R700) {
-		R600_ERR("chip_class is: %d, and not %d.\r\n",bc->chip_class,R700);
+		//R600_ERR("chip_class is: %d, and not %d.\r\n",bc->chip_class,R700);
 		num_res = 2;
 		chan /= 2;
 	}
@@ -423,10 +423,9 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 			bs->hw_cfile_elem[res] == chan)
 			return 0; /* Read for this scalar element already reserved, nothing to do here. */
 	}
-/*
-	R600_ERR("Failed to reserve cfile when looking for %i\r\n",sel);
-	R600_ERR("hw_cfile_addr are [%i,%i,%i,%i]\r\n",bs->hw_cfile_addr[0],bs->hw_cfile_addr[1],bs->hw_cfile_addr[2],bs->hw_cfile_addr[3]);
-*/
+	R600_ERR("Failed to reserve cfile when looking for %d\r\n",sel);
+	R600_ERR("hw_cfile_addr are [%d,%d,%d,%d]\r\n",bs->hw_cfile_addr[0],bs->hw_cfile_addr[1],bs->hw_cfile_addr[2],bs->hw_cfile_addr[3]);
+
 	/* All cfile read ports are used, cannot reference vector element. */
 	return -1;
 }
@@ -471,13 +470,14 @@ static int check_vector(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 			else {
 				r = reserve_gpr(bs, sel, elem, cycle);
 				if (r){
-					R600_ERR("Failed to reserve a GPR.\r\n");
+					R600_ERR("Vector failed to reserve_gpr\n\r");
 					return r;
 				}
 			}
 		} else if (is_cfile(sel)) {
 			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<16) + sel, elem);
 			if (r){
+				R600_ERR("Scalar failed to reserve_cfile\n\r");
 				return r;
 			}
 		}
@@ -573,6 +573,7 @@ static int check_and_set_bank_swizzle(struct r600_bytecode *bc,
 				if (slots[i]) {
 					r = check_vector(bc, slots[i], &bs, bank_swizzle[i]);
 					if (r){
+						R600_ERR("Vector couldn't be checked for alu: %d\r\n",i);
 						break;
 					}
 				}
@@ -589,6 +590,8 @@ static int check_and_set_bank_swizzle(struct r600_bytecode *bc,
 					slots[i]->bank_swizzle = bank_swizzle[i];
 			}
 			return 0;
+		}else{
+			R600_ERR("Scalar couldn't be checked for alu: 4\r\n");
 		}
 
 		if (scalar_only) {
