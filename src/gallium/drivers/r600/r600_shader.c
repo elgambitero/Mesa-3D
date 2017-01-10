@@ -7574,7 +7574,7 @@ static int tgsi_lrp(struct r600_shader_ctx *ctx)
 	struct tgsi_full_instruction *inst = &ctx->parse.FullToken.FullInstruction;
 	struct r600_bytecode_alu alu;
 	int lasti = tgsi_last_instruction(inst->Dst[0].Register.WriteMask);
-	unsigned i, temp_regs[2];
+	unsigned i, j, temp_regs[2];
 	int r;
 
 	/* optimize if it's just an equal balance */
